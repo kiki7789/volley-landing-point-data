@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>排球攻擊落點</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #111827;
+            color: #e5e7eb;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+            gap: 10px;
+        }
+
+        /* ── Top bar ── */
+        .top-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+        h1 { font-size: 1.05rem; font-weight: 700; color: #f9fafb; }
+        .top-actions { display: flex; gap: 8px; }
+        .action-btn {
+            padding: 7px 13px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .action-btn:active { opacity: 0.7; }
+        .btn-export { background: #1e3a5f; color: #93c5fd; }
+        .btn-clear  { background: #7f1d1d; color: #fca5a5; }
+
+        /* ── Courts row ── */
+        .courts-scroll {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            flex-shrink: 0;
+        }
+        .courts-row {
+            display: flex;
+            gap: 10px;
+            min-width: 630px;
+        }
+
+        /* ── Court column ── */
+        .court-col {
+            flex: 1;
+            min-width: 200px;
+            background: #1f2937;
+            border-radius: 12px;
+            padding: 9px;
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+        }
+
+        .col-title {
+            font-size: 1.05rem;
+            font-weight: 800;
+            text-align: center;
+            letter-spacing: 0.04em;
+        }
+
+        /* ── Player controls ── */
+        .single-ctrl {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            justify-content: center;
+        }
+        .single-label {
+            font-size: 0.75rem;
+            color: #9ca3af;
+        }
+
+        .rotation-ctrl {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .rot-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            justify-content: center;
+            flex-wrap: nowrap;
+        }
+        .rot-label {
+            font-size: 0.7rem;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+        .rot-btn {
+            padding: 5px 0;
+            background: #374151;
+            border: none;
+            border-radius: 7px;
+            color: #d1d5db;
+            font-size: 0.8rem;
+            font-weight: 700;
+            cursor: pointer;
+            width: 100%;
+            letter-spacing: 0.05em;
+        }
+        .rot-btn:active { opacity: 0.7; }
+
+        .pnum {
+            width: 52px;
+            height: 36px;
+            background: #111827;
+            border: 2px solid #374151;
+            border-radius: 8px;
+            color: #f9fafb;
+            font-size: 1.05rem;
+            font-weight: 700;
+            text-align: center;
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+        .pnum:focus { border-color: #34d399; }
+
+        /* ── Step bar ── */
+        .step-bar {
+            border-radius: 7px;
+            padding: 6px 9px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.74rem;
+            font-weight: 600;
+            min-height: 32px;
+        }
+        .step-pos  { background: #1e3a5f; border: 1px solid #3b82f6; color: #93c5fd; }
+        .step-land { background: #3d1515; border: 1px solid #ef4444; color: #fca5a5; }
+        .step-bar .cancel-btn {
+            background: rgba(255,255,255,0.12);
+            border: none;
+            border-radius: 5px;
+            color: inherit;
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 3px 8px;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        /* ── Canvas ── */
+        canvas {
+            width: 100%;
+            display: block;
+            border-radius: 8px;
+            touch-action: none;
+            cursor: crosshair;
+        }
+
+        /* ── Column footer ── */
+        .col-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px;
+        }
+        .undo-btn {
+            background: #374151;
+            border: none;
+            border-radius: 7px;
+            color: #d1d5db;
+            font-size: 0.78rem;
+            font-weight: 600;
+            padding: 6px 11px;
+            cursor: pointer;
+        }
+        .undo-btn:active { opacity: 0.7; }
+        .count-badge {
+            font-size: 0.72rem;
+            color: #9ca3af;
+            background: #374151;
+            padding: 3px 9px;
+            border-radius: 10px;
+            white-space: nowrap;
+        }
+
+        /* ── Records panel ── */
+        .records-panel {
+            background: #1f2937;
+            border-radius: 12px;
+            padding: 12px 14px;
+            flex-shrink: 0;
+        }
+        .records-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        .records-title { font-size: 0.88rem; font-weight: 600; }
+        .total-badge { background: #374151; color: #9ca3af; font-size: 0.72rem; padding: 2px 8px; border-radius: 10px; }
+        .records-list {
+            max-height: 130px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+        .record-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 8px;
+            border-radius: 6px;
+            background: #111827;
+            font-size: 0.74rem;
+        }
+        .r-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+        .r-meta { color: #6b7280; margin-left: auto; font-size: 0.68rem; white-space: nowrap; }
+        .empty-hint { color: #4b5563; font-size: 0.8rem; text-align: center; padding: 14px 0; }
+
+        /* ── Analysis overlay (full-screen) ── */
+        .analysis-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: #111827;
+            z-index: 200;
+            flex-direction: column;
+            padding: 10px;
+            gap: 8px;
+        }
+        .analysis-overlay.open { display: flex; }
+        .analysis-ov-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+        .analysis-ov-title { font-size: 1rem; font-weight: 700; color: #f9fafb; flex: 1; }
+        .analysis-close {
+            padding: 6px 13px;
+            background: #374151;
+            border: none;
+            border-radius: 8px;
+            color: #d1d5db;
+            font-size: 0.8rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .analysis-close:active { opacity: 0.7; }
+        .player-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+        .player-chip {
+            padding: 5px 12px;
+            border-radius: 20px;
+            border: 2px solid var(--chip-color, #374151);
+            background: transparent;
+            color: var(--chip-color, #d1d5db);
+            font-size: 0.75rem;
+            font-weight: 700;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        .player-chip.selected {
+            background: var(--chip-color, #374151);
+            color: #111827;
+        }
+        .player-chip:active { opacity: 0.7; }
+        .chip-empty { font-size: 0.78rem; color: #4b5563; }
+        .analysis-canvas-wrap {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 0;
+            overflow: hidden;
+        }
+        #canvas-analysis {
+            height: 100%;
+            width: auto;
+            max-width: 100%;
+            border-radius: 8px;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div class="top-bar">
+    <h1>排球攻擊落點</h1>
+    <div class="top-actions">
+        <button class="action-btn btn-export" onclick="exportCSV()">匯出 CSV</button>
+        <button class="action-btn" style="background:#1c3a2a;color:#6ee7b7" onclick="openAnalysis()">賽後分析</button>
+        <button class="action-btn btn-clear"  onclick="clearAll()">清除全部</button>
+    </div>
+</div>
+
+<!-- Three courts -->
+<div class="courts-scroll">
+    <div class="courts-row">
+
+        <!-- 副攻 (court 0) -->
+        <div class="court-col">
+            <div class="col-title" style="color:#f87171">副攻</div>
+            <div class="single-ctrl">
+                <span class="single-label">號碼</span>
+                <input type="number" class="pnum" id="p0a" value="1" min="1" max="99" inputmode="numeric">
+            </div>
+            <div class="step-bar step-pos" id="step-0">
+                <span id="step-text-0">① 點擊站位 (對方前排)</span>
+            </div>
+            <canvas id="canvas-0"></canvas>
+            <div class="col-footer">
+                <button class="undo-btn" onclick="undoLast(0)">↩ 復原</button>
+                <span class="count-badge" id="count-0">0 筆</span>
+            </div>
+        </div>
+
+        <!-- 欄中 (court 1) -->
+        <div class="court-col">
+            <div class="col-title" style="color:#60a5fa">欄中</div>
+            <div class="rotation-ctrl">
+                <div class="rot-row">
+                    <span class="rot-label" id="rotlabel-1-a" style="color:#60a5fa">前排▶</span>
+                    <input type="number" class="pnum" id="p1a" value="2" min="1" max="99" inputmode="numeric">
+                    <span class="rot-label" id="rotlabel-1-b" style="color:#6b7280">後排</span>
+                    <input type="number" class="pnum" id="p1b" value="5" min="1" max="99" inputmode="numeric">
+                </div>
+                <button class="rot-btn" onclick="rotate(1)">⇄ 輪轉</button>
+            </div>
+            <div class="step-bar step-pos" id="step-1">
+                <span id="step-text-1">① 點擊站位 (對方前排)</span>
+            </div>
+            <canvas id="canvas-1"></canvas>
+            <div class="col-footer">
+                <button class="undo-btn" onclick="undoLast(1)">↩ 復原</button>
+                <span class="count-badge" id="count-1">0 筆</span>
+            </div>
+        </div>
+
+        <!-- 大砲 (court 2) -->
+        <div class="court-col">
+            <div class="col-title" style="color:#34d399">大砲</div>
+            <div class="rotation-ctrl">
+                <div class="rot-row">
+                    <span class="rot-label" id="rotlabel-2-a" style="color:#34d399">前排▶</span>
+                    <input type="number" class="pnum" id="p2a" value="3" min="1" max="99" inputmode="numeric">
+                    <span class="rot-label" id="rotlabel-2-b" style="color:#6b7280">後排</span>
+                    <input type="number" class="pnum" id="p2b" value="6" min="1" max="99" inputmode="numeric">
+                </div>
+                <button class="rot-btn" onclick="rotate(2)">⇄ 輪轉</button>
+            </div>
+            <div class="step-bar step-pos" id="step-2">
+                <span id="step-text-2">① 點擊站位 (對方前排)</span>
+            </div>
+            <canvas id="canvas-2"></canvas>
+            <div class="col-footer">
+                <button class="undo-btn" onclick="undoLast(2)">↩ 復原</button>
+                <span class="count-badge" id="count-2">0 筆</span>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Records panel -->
+<div class="records-panel">
+    <div class="records-header">
+        <span class="records-title">記錄列表</span>
+        <span class="total-badge" id="totalBadge">0 筆</span>
+    </div>
+    <div class="records-list" id="recordsList">
+        <div class="empty-hint">尚無記錄，依步驟點擊球場開始</div>
+    </div>
+</div>
+
+<!-- Analysis overlay (full-screen) -->
+<div class="analysis-overlay" id="analysis-overlay">
+    <div class="analysis-ov-header">
+        <span class="analysis-ov-title">賽後分析</span>
+        <button class="analysis-close" onclick="closeAnalysis()">✕ 關閉</button>
+    </div>
+    <div id="player-chips" class="player-chips"></div>
+    <div class="analysis-canvas-wrap">
+        <canvas id="canvas-analysis"></canvas>
+    </div>
+</div>
+
+<script>
+// ─── Layout constants (internal canvas coords) ────────────────────────────────
+const CW      = 300;
+const M       = 15;
+const COURT_W = CW - 2 * M;
+const HALF_H  = COURT_W;
+const OPP_H   = Math.round(HALF_H / 3);
+const NET_H   = 20;
+const OUR_H   = HALF_H;
+
+const OPP_TOP = M;
+const NET_TOP = OPP_TOP + OPP_H;
+const OUR_TOP = NET_TOP + NET_H;
+const OUR_BOT = OUR_TOP + OUR_H;
+const CW_H    = OUR_BOT + M;
+const CX      = M;
+
+// ─── Position config ──────────────────────────────────────────────────────────
+const POSITIONS = [
+    { label: '副攻', hasRotation: false, color: '#f87171' },
+    { label: '欄中', hasRotation: true,  color: '#60a5fa' },
+    { label: '大砲', hasRotation: true,  color: '#34d399' }
+];
+
+// ─── Player colour palette ────────────────────────────────────────────────────
+const PLAYER_PALETTE = [
+    '#FF3333','#FF8800','#FFD700','#33CC33','#00CCAA',
+    '#00BBFF','#3366FF','#9933FF','#FF33CC','#FF6699',
+    '#CC0000','#CC6600','#999900','#006600','#007755',
+    '#0066AA','#0033BB','#6600CC','#AA0077','#FF9966',
+];
+
+function playerColor(player) {
+    if (!player || player <= 0) return '#9ca3af';
+    return PLAYER_PALETTE[(player - 1) % PLAYER_PALETTE.length];
+}
+
+// ─── Per-court state ──────────────────────────────────────────────────────────
+const states = POSITIONS.map((p, i) => ({
+    id: i,
+    label: p.label,
+    hasRotation: p.hasRotation,
+    color: p.color,
+    frontIdx: 0,
+    inputState: 'pos',
+    pendingPos: null
+}));
+
+let records  = [];
+const canvases = [];
+const ctxs     = [];
+
+// ─── Zone helpers ─────────────────────────────────────────────────────────────
+function getOppFrontZone(rx) {
+    return rx < 1/3 ? 2 : rx < 2/3 ? 3 : 4;
+}
+
+function getOurZone(rx, ry) {
+    const col = rx < 1/3 ? 0 : rx < 2/3 ? 1 : 2;
+    const row = ry < 1/3 ? 0 : 1;
+    return [[4,3,2],[5,6,1]][row][col];
+}
+
+// ─── Player helpers ───────────────────────────────────────────────────────────
+function getActivePlayer(ci) {
+    const s = states[ci];
+    const slot = (!s.hasRotation || s.frontIdx === 0) ? 'a' : 'b';
+    const val  = parseInt(document.getElementById(`p${ci}${slot}`).value, 10);
+    return isNaN(val) || val <= 0 ? 0 : val;
+}
+
+// ─── Drawing ──────────────────────────────────────────────────────────────────
+function drawCourtFor(ci) {
+    const s   = states[ci];
+    const ctx = ctxs[ci];
+
+    ctx.clearRect(0, 0, CW, CW_H);
+
+    ctx.fillStyle = '#0f1f16';
+    ctx.beginPath();
+    ctx.roundRect(0, 0, CW, CW_H, 12);
+    ctx.fill();
+
+    if (s.inputState === 'pos') {
+        ctx.fillStyle = 'rgba(59,130,246,0.07)';
+        ctx.fillRect(CX, OPP_TOP, COURT_W, OPP_H);
+    } else {
+        ctx.fillStyle = 'rgba(239,68,68,0.07)';
+        ctx.fillRect(CX, OUR_TOP, COURT_W, OUR_H);
+    }
+
+    ctx.fillStyle = '#152e1f';
+    ctx.fillRect(CX, OPP_TOP, COURT_W, OPP_H);
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+    ctx.lineWidth = 1;
+    [1/3, 2/3].forEach(f => {
+        ctx.beginPath();
+        ctx.moveTo(CX + COURT_W * f, OPP_TOP);
+        ctx.lineTo(CX + COURT_W * f, NET_TOP);
+        ctx.stroke();
+    });
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([7, 5]);
+    ctx.beginPath(); ctx.moveTo(CX, OPP_TOP); ctx.lineTo(CX + COURT_W, OPP_TOP); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(CX, OPP_TOP); ctx.lineTo(CX, NET_TOP); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(CX + COURT_W, OPP_TOP); ctx.lineTo(CX + COURT_W, NET_TOP); ctx.stroke();
+
+    const zW    = COURT_W / 3;
+    const oppCY = OPP_TOP + OPP_H / 2;
+    ctx.fillStyle = 'rgba(255,255,255,0.20)';
+    ctx.font = 'bold 30px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    [2, 3, 4].forEach((z, i) => ctx.fillText(z, CX + (i + 0.5) * zW, oppCY));
+
+    ctx.fillStyle = 'rgba(255,255,255,0.06)';
+    ctx.fillRect(CX, NET_TOP, COURT_W, NET_H);
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.moveTo(CX, NET_TOP); ctx.lineTo(CX + COURT_W, NET_TOP); ctx.stroke();
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(CX, NET_TOP + NET_H); ctx.lineTo(CX + COURT_W, NET_TOP + NET_H); ctx.stroke();
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('N E T', CW / 2, NET_TOP + NET_H / 2);
+
+    ctx.fillStyle = '#1a4731';
+    ctx.fillRect(CX, OUR_TOP, COURT_W, OUR_H);
+
+    const atkY = OUR_TOP + OUR_H / 3;
+    ctx.strokeStyle = 'rgba(255,255,255,0.28)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([8, 6]);
+    ctx.beginPath(); ctx.moveTo(CX, atkY); ctx.lineTo(CX + COURT_W, atkY); ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+    ctx.lineWidth = 1;
+    [1/3, 2/3].forEach(f => {
+        ctx.beginPath();
+        ctx.moveTo(CX + COURT_W * f, OUR_TOP);
+        ctx.lineTo(CX + COURT_W * f, OUR_BOT);
+        ctx.stroke();
+    });
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(CX, OUR_TOP, COURT_W, OUR_H);
+
+    const frontCY = (OUR_TOP + atkY) / 2;
+    const backCY  = (atkY + OUR_BOT) / 2;
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.font = 'bold 30px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    [4, 3, 2].forEach((z, i) => ctx.fillText(z, CX + (i + 0.5) * zW, frontCY));
+    [5, 6, 1].forEach((z, i) => ctx.fillText(z, CX + (i + 0.5) * zW, backCY));
+
+    const activePlayer = getActivePlayer(ci);
+    records.filter(r => r.courtId === ci && r.player === activePlayer)
+           .forEach(r => drawRecord(ctx, r, playerColor(r.player)));
+
+    if (s.inputState === 'land' && s.pendingPos) {
+        const px = CX + s.pendingPos.rx * COURT_W;
+        const py = OPP_TOP + s.pendingPos.ry * OPP_H;
+        drawPosDot(ctx, px, py, playerColor(getActivePlayer(ci)), true);
+    }
+}
+
+function drawRecord(ctx, r, color) {
+    const px = CX + r.posRx * COURT_W;
+    const py = OPP_TOP + r.posRy * OPP_H;
+    const lx = CX + r.landRx * COURT_W;
+    const ly = OUR_TOP + r.landRy * OUR_H;
+
+    ctx.beginPath();
+    ctx.moveTo(px, py);
+    ctx.lineTo(lx, ly);
+    ctx.strokeStyle = color + '60';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    drawArrow(ctx, px, py, lx, ly, color);
+    drawPosDot(ctx, px, py, color, false);
+    drawLandDot(ctx, lx, ly, color);
+}
+
+function drawArrow(ctx, x1, y1, x2, y2, color) {
+    const angle  = Math.atan2(y2 - y1, x2 - x1);
+    const len    = 13;
+    const spread = 0.4;
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - len * Math.cos(angle - spread), y2 - len * Math.sin(angle - spread));
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - len * Math.cos(angle + spread), y2 - len * Math.sin(angle + spread));
+    ctx.strokeStyle = color + 'aa';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+}
+
+function drawPosDot(ctx, px, py, color, pending) {
+    const R = 5;
+    const g = ctx.createRadialGradient(px, py, 0, px, py, R * 2.3);
+    g.addColorStop(0, color + '35'); g.addColorStop(1, 'transparent');
+    ctx.beginPath(); ctx.arc(px, py, R * 2.3, 0, Math.PI * 2);
+    ctx.fillStyle = g; ctx.fill();
+    ctx.beginPath(); ctx.arc(px, py, R, 0, Math.PI * 2);
+    ctx.fillStyle = pending ? color + '22' : '#1a4731cc';
+    ctx.fill();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = pending ? 2 : 1.5;
+    if (pending) ctx.setLineDash([4, 3]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+}
+
+function drawLandDot(ctx, lx, ly, color) {
+    const R = 5;
+    const g = ctx.createRadialGradient(lx, ly, 0, lx, ly, R * 2.3);
+    g.addColorStop(0, color + '45'); g.addColorStop(1, 'transparent');
+    ctx.beginPath(); ctx.arc(lx, ly, R * 2.3, 0, Math.PI * 2);
+    ctx.fillStyle = g; ctx.fill();
+    ctx.beginPath(); ctx.arc(lx, ly, R, 0, Math.PI * 2);
+    ctx.fillStyle = color + 'cc';
+    ctx.fill();
+    ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
+}
+
+// ─── Input handling ───────────────────────────────────────────────────────────
+function handleTap(ci, clientX, clientY) {
+    const s      = states[ci];
+    const canvas = canvases[ci];
+    const rect   = canvas.getBoundingClientRect();
+    const scaleX = CW   / rect.width;
+    const scaleY = CW_H / rect.height;
+    const x = (clientX - rect.left) * scaleX;
+    const y = (clientY - rect.top)  * scaleY;
+
+    const inOpp = x >= CX && x <= CX + COURT_W && y >= OPP_TOP && y < NET_TOP;
+    const inOur = x >= CX && x <= CX + COURT_W && y >= OUR_TOP && y <= OUR_BOT;
+
+    if (s.inputState === 'pos') {
+        if (!inOpp) return;
+        s.pendingPos = { rx: (x - CX) / COURT_W, ry: (y - OPP_TOP) / OPP_H };
+        s.inputState = 'land';
+        drawCourtFor(ci);
+        updateStepBar(ci);
+    } else {
+        if (inOpp) {
+            s.pendingPos = { rx: (x - CX) / COURT_W, ry: (y - OPP_TOP) / OPP_H };
+            drawCourtFor(ci);
+            return;
+        }
+        if (!inOur) return;
+
+        const landRx = (x - CX) / COURT_W;
+        const landRy = (y - OUR_TOP) / OUR_H;
+
+        records.push({
+            id:       Date.now(),
+            courtId:  ci,
+            label:    s.label,
+            player:   getActivePlayer(ci),
+            posRx:    s.pendingPos.rx,
+            posRy:    s.pendingPos.ry,
+            landRx,
+            landRy,
+            posZone:  getOppFrontZone(s.pendingPos.rx),
+            landZone: getOurZone(landRx, landRy),
+            time:     new Date()
+        });
+
+        s.pendingPos = null;
+        s.inputState = 'pos';
+        refreshCourt(ci);
+    }
+}
+
+// ─── Rotation ─────────────────────────────────────────────────────────────────
+function rotate(ci) {
+    const s = states[ci];
+    if (!s.hasRotation) return;
+    if (s.inputState === 'land') cancelPending(ci);
+    s.frontIdx = s.frontIdx === 0 ? 1 : 0;
+    updateRotationUI(ci);
+    drawCourtFor(ci);
+    updateCountBadge(ci);
+}
+
+function updateRotationUI(ci) {
+    const s      = states[ci];
+    const aLabel = document.getElementById(`rotlabel-${ci}-a`);
+    const bLabel = document.getElementById(`rotlabel-${ci}-b`);
+    if (s.frontIdx === 0) {
+        aLabel.textContent = '前排▶'; aLabel.style.color = s.color;
+        bLabel.textContent = '後排';  bLabel.style.color = '#6b7280';
+    } else {
+        aLabel.textContent = '後排';  aLabel.style.color = '#6b7280';
+        bLabel.textContent = '前排▶'; bLabel.style.color = s.color;
+    }
+}
+
+function cancelPending(ci) {
+    states[ci].pendingPos = null;
+    states[ci].inputState = 'pos';
+    drawCourtFor(ci);
+    updateStepBar(ci);
+}
+
+// ─── UI updates ───────────────────────────────────────────────────────────────
+function updateStepBar(ci) {
+    const s    = states[ci];
+    const bar  = document.getElementById(`step-${ci}`);
+    const span = document.getElementById(`step-text-${ci}`);
+    const old  = bar.querySelector('.cancel-btn');
+    if (old) old.remove();
+
+    if (s.inputState === 'pos') {
+        bar.className    = 'step-bar step-pos';
+        span.textContent = '① 點擊站位 (對方前排)';
+    } else {
+        bar.className    = 'step-bar step-land';
+        span.textContent = '② 點擊落點 (我方區域)';
+        const btn = document.createElement('button');
+        btn.className   = 'cancel-btn';
+        btn.textContent = '取消';
+        btn.onclick     = () => cancelPending(ci);
+        bar.appendChild(btn);
+    }
+}
+
+function updateCountBadge(ci) {
+    const activePlayer = getActivePlayer(ci);
+    const n = records.filter(r => r.courtId === ci && r.player === activePlayer).length;
+    document.getElementById(`count-${ci}`).textContent = `${n} 筆`;
+}
+
+function refreshCourt(ci) {
+    drawCourtFor(ci);
+    updateStepBar(ci);
+    updateCountBadge(ci);
+    renderRecordsList();
+}
+
+// ─── Actions ──────────────────────────────────────────────────────────────────
+function undoLast(ci) {
+    if (states[ci].inputState === 'land') { cancelPending(ci); return; }
+    const idx = [...records.keys()].reverse().find(i => records[i].courtId === ci);
+    if (idx !== undefined) records.splice(idx, 1);
+    refreshCourt(ci);
+}
+
+function clearAll() {
+    if (!records.length) return;
+    if (!confirm(`確定要清除全部 ${records.length} 筆記錄嗎？`)) return;
+    records = [];
+    states.forEach((s, ci) => {
+        s.pendingPos = null;
+        s.inputState = 'pos';
+        updateStepBar(ci);
+        drawCourtFor(ci);
+        updateCountBadge(ci);
+    });
+    renderRecordsList();
+}
+
+function exportCSV() {
+    if (!records.length) { alert('尚無記錄可匯出'); return; }
+    const headers = ['序號', '位置', '選手號碼', '站位區域', '落點區域', '時間'];
+    const rows = records.map((r, i) => [
+        i + 1, r.label, r.player,
+        `Zone ${r.posZone}`, `Zone ${r.landZone}`,
+        r.time.toLocaleString('zh-TW')
+    ]);
+    const csv  = [headers, ...rows].map(row => row.join(',')).join('\n');
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+    const a    = document.createElement('a');
+    a.href     = URL.createObjectURL(blob);
+    a.download = `排球落點_${new Date().toLocaleDateString('zh-TW').replace(/\//g, '')}.csv`;
+    a.click();
+}
+
+// ─── Analysis overlay ─────────────────────────────────────────────────────────
+const selectedAnalysisPlayers = new Set();
+
+function openAnalysis() {
+    buildPlayerChips();
+    drawAnalysisCourt();
+    document.getElementById('analysis-overlay').classList.add('open');
+}
+
+function closeAnalysis() {
+    document.getElementById('analysis-overlay').classList.remove('open');
+}
+
+function buildPlayerChips() {
+    const playerMap = {};
+    records.forEach(r => { playerMap[r.player] = r.label; });
+
+    const chips   = document.getElementById('player-chips');
+    chips.innerHTML = '';
+
+    const players = Object.keys(playerMap).map(Number).sort((a, b) => a - b);
+    if (!players.length) {
+        chips.innerHTML = '<span class="chip-empty">尚無記錄</span>';
+        return;
+    }
+
+    const allSelected = players.every(p => selectedAnalysisPlayers.has(p));
+    const allChip = document.createElement('button');
+    allChip.className = 'player-chip' + (allSelected ? ' selected' : '');
+    allChip.style.setProperty('--chip-color', '#e5e7eb');
+    allChip.textContent = '#all';
+    allChip.onclick = () => {
+        if (allSelected) selectedAnalysisPlayers.clear();
+        else players.forEach(p => selectedAnalysisPlayers.add(p));
+        buildPlayerChips();
+        drawAnalysisCourt();
+    };
+    chips.appendChild(allChip);
+
+    players.forEach(player => {
+        const color = playerColor(player);
+        const btn   = document.createElement('button');
+        btn.className = 'player-chip' + (selectedAnalysisPlayers.has(player) ? ' selected' : '');
+        btn.style.setProperty('--chip-color', color);
+        btn.textContent = `#${player} ${playerMap[player]}`;
+        btn.onclick = () => {
+            if (selectedAnalysisPlayers.has(player)) selectedAnalysisPlayers.delete(player);
+            else selectedAnalysisPlayers.add(player);
+            buildPlayerChips();
+            drawAnalysisCourt();
+        };
+        chips.appendChild(btn);
+    });
+}
+
+function drawAnalysisCourt() {
+    const canvas = document.getElementById('canvas-analysis');
+    const ctx    = canvas.getContext('2d');
+    const zW     = COURT_W / 3;
+
+    ctx.clearRect(0, 0, CW, CW_H);
+
+    ctx.fillStyle = '#0f1f16';
+    ctx.beginPath(); ctx.roundRect(0, 0, CW, CW_H, 12); ctx.fill();
+
+    ctx.fillStyle = '#152e1f';
+    ctx.fillRect(CX, OPP_TOP, COURT_W, OPP_H);
+    ctx.strokeStyle = 'rgba(255,255,255,0.14)'; ctx.lineWidth = 1;
+    [1/3, 2/3].forEach(f => {
+        ctx.beginPath(); ctx.moveTo(CX + COURT_W * f, OPP_TOP); ctx.lineTo(CX + COURT_W * f, NET_TOP); ctx.stroke();
+    });
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 2;
+    ctx.setLineDash([7, 5]);
+    ctx.beginPath(); ctx.moveTo(CX, OPP_TOP); ctx.lineTo(CX + COURT_W, OPP_TOP); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(CX, OPP_TOP); ctx.lineTo(CX, NET_TOP); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(CX + COURT_W, OPP_TOP); ctx.lineTo(CX + COURT_W, NET_TOP); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.20)';
+    ctx.font = 'bold 30px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    [2, 3, 4].forEach((z, i) => ctx.fillText(z, CX + (i + 0.5) * zW, OPP_TOP + OPP_H / 2));
+
+    ctx.fillStyle = 'rgba(255,255,255,0.06)'; ctx.fillRect(CX, NET_TOP, COURT_W, NET_H);
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.moveTo(CX, NET_TOP); ctx.lineTo(CX + COURT_W, NET_TOP); ctx.stroke();
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(CX, NET_TOP + NET_H); ctx.lineTo(CX + COURT_W, NET_TOP + NET_H); ctx.stroke();
+    ctx.fillStyle = '#94a3b8'; ctx.font = 'bold 11px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('N E T', CW / 2, NET_TOP + NET_H / 2);
+
+    ctx.fillStyle = '#1a4731'; ctx.fillRect(CX, OUR_TOP, COURT_W, OUR_H);
+    const atkY = OUR_TOP + OUR_H / 3;
+    ctx.strokeStyle = 'rgba(255,255,255,0.28)'; ctx.lineWidth = 1.5;
+    ctx.setLineDash([8, 6]);
+    ctx.beginPath(); ctx.moveTo(CX, atkY); ctx.lineTo(CX + COURT_W, atkY); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle = 'rgba(255,255,255,0.14)'; ctx.lineWidth = 1;
+    [1/3, 2/3].forEach(f => {
+        ctx.beginPath(); ctx.moveTo(CX + COURT_W * f, OUR_TOP); ctx.lineTo(CX + COURT_W * f, OUR_BOT); ctx.stroke();
+    });
+    ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 3;
+    ctx.strokeRect(CX, OUR_TOP, COURT_W, OUR_H);
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.font = 'bold 30px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    [4, 3, 2].forEach((z, i) => ctx.fillText(z, CX + (i + 0.5) * zW, (OUR_TOP + atkY) / 2));
+    [5, 6, 1].forEach((z, i) => ctx.fillText(z, CX + (i + 0.5) * zW, (atkY + OUR_BOT) / 2));
+
+    records.filter(r => selectedAnalysisPlayers.has(r.player))
+           .forEach(r => drawRecord(ctx, r, playerColor(r.player)));
+}
+
+function renderRecordsList() {
+    const list  = document.getElementById('recordsList');
+    const badge = document.getElementById('totalBadge');
+    badge.textContent = `${records.length} 筆`;
+    if (!records.length) {
+        list.innerHTML = '<div class="empty-hint">尚無記錄，依步驟點擊球場開始</div>';
+        return;
+    }
+    if (document.getElementById('analysis-overlay').classList.contains('open')) {
+        buildPlayerChips(); drawAnalysisCourt();
+    }
+
+    const colorMap = Object.fromEntries(states.map(s => [s.id, s.color]));
+    list.innerHTML = records.slice().reverse().map(r => {
+        const color   = colorMap[r.courtId];
+        const timeStr = r.time.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        return `<div class="record-item">
+            <div class="r-dot" style="background:${color}"></div>
+            <span style="color:${color};font-weight:700">${r.label}</span>
+            <span style="color:#9ca3af">#${r.player}</span>
+            <span>Zone ${r.posZone}</span>
+            <span style="color:#6b7280">→</span>
+            <span>Zone ${r.landZone}</span>
+            <span class="r-meta">${timeStr}</span>
+        </div>`;
+    }).join('');
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+POSITIONS.forEach((pos, ci) => {
+    const canvas  = document.getElementById(`canvas-${ci}`);
+    canvases[ci]  = canvas;
+    ctxs[ci]      = canvas.getContext('2d');
+    canvas.width  = CW;
+    canvas.height = CW_H;
+
+    canvas.addEventListener('click', e => handleTap(ci, e.clientX, e.clientY));
+    canvas.addEventListener('touchend', e => {
+        e.preventDefault();
+        const t = e.changedTouches[0];
+        handleTap(ci, t.clientX, t.clientY);
+    }, { passive: false });
+
+    ['a', 'b'].forEach(slot => {
+        const inp = document.getElementById(`p${ci}${slot}`);
+        if (inp) inp.addEventListener('input', () => refreshCourt(ci));
+    });
+
+    updateStepBar(ci);
+    drawCourtFor(ci);
+});
+
+const analysisCanvas  = document.getElementById('canvas-analysis');
+analysisCanvas.width  = CW;
+analysisCanvas.height = CW_H;
+
+renderRecordsList();
+</script>
+</body>
+</html>
